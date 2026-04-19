@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 from checks import CheckResult
+from rate_limiter import on_rate_limit, wait as rl_wait
 
 _RUBRICS_DIR = Path(__file__).parent / "rubrics"
 
@@ -33,12 +34,14 @@ def _create_with_retry(client, **kwargs) -> object:
     import anthropic
     delay = _RETRY_BASE_DELAY
     for attempt in range(_MAX_RETRIES + 1):
+        rl_wait()  # block if any thread triggered a global pause
         try:
             return client.messages.create(**kwargs)
         except anthropic.RateLimitError:
             if attempt == _MAX_RETRIES:
                 raise
-            time.sleep(delay)
+            on_rate_limit(delay)  # pause all threads
+            rl_wait()
             delay *= 2
         except anthropic.APIStatusError as e:
             if e.status_code < 500 or attempt == _MAX_RETRIES:

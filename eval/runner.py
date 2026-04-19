@@ -34,6 +34,7 @@ from dotenv import load_dotenv
 
 from checks import CheckResult, load_plugins, run_deterministic_checks
 from judge import judge_factual_correctness
+from rate_limiter import on_rate_limit, wait as rl_wait
 from report import load_baseline, print_diff, print_report, save_report
 from viewer import generate_index, generate_viewer
 
@@ -161,12 +162,18 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 5.0  # seconds
 
 
+def _is_rate_limit_error(result) -> bool:
+    """Check if a RunResult failed due to a rate limit error inside the agent."""
+    err = result.error or ""
+    return "RateLimitError" in err or "429" in err
+
+
 def _run_agent_with_retry(question: str, case_id: str) -> object:
     """Call run_agent with exponential backoff on rate-limit and server errors.
 
-    Only retries on:
-      - 429 RateLimitError
-      - 5xx APIStatusError
+    Handles two cases:
+      - Exceptions raised before the agent loop (caught here directly)
+      - RateLimitError caught *inside* the agent, returned as stopped_reason=error
     Never retries on assertion-level failures.
     """
     import anthropic
@@ -174,15 +181,18 @@ def _run_agent_with_retry(question: str, case_id: str) -> object:
 
     delay = _RETRY_BASE_DELAY
     for attempt in range(_MAX_RETRIES + 1):
+        rl_wait()  # block if any thread triggered a global pause
         try:
-            return run_agent(question)
+            result = run_agent(question)
         except anthropic.RateLimitError:
             if attempt == _MAX_RETRIES:
                 raise
-            _log(f"  [RATE] {case_id}: rate limited, retrying in {delay:.0f}s "
+            on_rate_limit(delay)
+            _log(f"  [RATE] {case_id}: rate limited (exception) — pausing all threads {delay:.0f}s "
                  f"(attempt {attempt + 1}/{_MAX_RETRIES})")
-            time.sleep(delay)
+            rl_wait()
             delay *= 2
+            continue
         except anthropic.APIStatusError as e:
             if e.status_code < 500 or attempt == _MAX_RETRIES:
                 raise
@@ -190,6 +200,20 @@ def _run_agent_with_retry(question: str, case_id: str) -> object:
                  f"(attempt {attempt + 1}/{_MAX_RETRIES})")
             time.sleep(delay)
             delay *= 2
+            continue
+
+        # Agent swallowed the rate limit internally — detect and retry
+        if result.stopped_reason == "error" and _is_rate_limit_error(result):
+            if attempt == _MAX_RETRIES:
+                return result
+            on_rate_limit(delay)
+            _log(f"  [RATE] {case_id}: rate limited (agent internal) — pausing all threads {delay:.0f}s "
+                 f"(attempt {attempt + 1}/{_MAX_RETRIES})")
+            rl_wait()
+            delay *= 2
+            continue
+
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -234,8 +258,9 @@ def evaluate_case(
             )
         loaded_from_disk = True
     else:
-        agent_result = _load_trace(traces_dir, case_id, repeat_index)
-        if agent_result is not None:
+        cached = _load_trace(traces_dir, case_id, repeat_index)
+        if cached is not None and cached.stopped_reason != "error":
+            agent_result = cached
             loaded_from_disk = True
         else:
             try:

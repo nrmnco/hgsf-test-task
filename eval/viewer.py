@@ -347,17 +347,31 @@ def generate_index(results: list["EvalResult"], output_path: Path) -> None:
     rows = []
     for r in results:
         cls = "pass" if r.overall_passed else "fail"
-        label = "PASS" if r.overall_passed else "FAIL"
-        viewer_file = f"traces/eval-{r.case_id}.html"
-
         failed = [c.check_name for c in r.checks if not c.passed and c.score != -1.0]
         failed_str = ", ".join(failed) if failed else ""
 
+        # Build label and links depending on whether this is a repeats run
+        if r.sub_runs:
+            n_passed = r.passed_count
+            n_total = r.total_runs
+            label = f"{n_passed}/{n_total}"
+            badge_cls = "pass" if n_passed == n_total else "fail"
+            links_html = " ".join(
+                f'<a href="traces/eval-{_e(r.case_id)}-rep{i}.html">rep{i}</a>'
+                for i in range(1, n_total + 1)
+            )
+            case_cell = f'{_e(r.case_id)}<br><span style="font-size:11px">{links_html}</span>'
+        else:
+            label = "PASS" if r.overall_passed else "FAIL"
+            badge_cls = cls
+            viewer_file = f"traces/eval-{r.case_id}.html"
+            case_cell = f'<a href="{_e(viewer_file)}">{_e(r.case_id)}</a>'
+
         rows.append(
             f'<tr class="{cls}">'
-            f'<td><a href="{_e(viewer_file)}">{_e(r.case_id)}</a></td>'
+            f'<td>{case_cell}</td>'
             f'<td>{_e(r.category)}</td>'
-            f'<td><span class="badge {cls}">{label}</span></td>'
+            f'<td><span class="badge {badge_cls}">{label}</span></td>'
             f'<td style="color:#fc8181;font-size:12px">{_e(failed_str)}</td>'
             f'<td>${r.cost_usd:.4f}</td>'
             f'</tr>'
