@@ -5,6 +5,7 @@ Usage:
     python eval/runner.py --case-id space-01           # single case
     python eval/runner.py --case-id space-01 space-02
     python eval/runner.py --dry-run                    # load existing traces, skip LLM judge
+    python eval/runner.py --rescore                    # load existing traces, re-run checks + judge
     python eval/runner.py --concurrency 8              # increase parallelism (default: 4)
     python eval/runner.py --repeats 3                  # run each case 3 times (flakiness)
     python eval/runner.py --output my_report.json
@@ -233,11 +234,17 @@ def evaluate_case(
     traces_dir: Path,
     dry_run: bool,
     repeat_index: int = 0,
+    rescore: bool = False,
 ) -> EvalResult:
     """Evaluate one case, one repeat.
 
     repeat_index=0 means single run (backward-compatible trace name).
     repeat_index>=1 means this is the Nth repeat of a --repeats run.
+
+    Modes:
+      default:   run agent live (use cached trace if available), run all checks + judge
+      --dry-run: load trace from disk, skip judge (fast offline check of deterministic checks)
+      --rescore: load trace from disk, run all checks + judge (re-score without re-running agent)
     """
     case_id = case["id"]
     question = case["question"]
@@ -249,17 +256,18 @@ def evaluate_case(
     agent_result = None
     loaded_from_disk = False
 
-    if dry_run:
+    if dry_run or rescore:
         agent_result = _load_trace(traces_dir, case_id, repeat_index)
         if agent_result is None:
-            _log(f"  [SKIP] {label}: no trace found on disk (dry-run mode)")
+            mode_name = "dry-run" if dry_run else "rescore"
+            _log(f"  [SKIP] {label}: no trace found on disk ({mode_name} mode)")
             return EvalResult(
                 case_id=case_id,
                 category=category,
                 question=question,
                 run_id=None,
                 stopped_reason="error",
-                error="no trace found (dry-run mode)",
+                error=f"no trace found ({mode_name} mode)",
                 checks=[],
                 overall_passed=False,
             )
@@ -285,12 +293,12 @@ def evaluate_case(
     # Step 2: deterministic checks
     checks = run_deterministic_checks(case, agent_result, dry_run=dry_run)
 
-    # Step 3: LLM judge
+    # Step 3: LLM judge (skipped only in --dry-run; --rescore still runs it)
     judge_result = judge_factual_correctness(
         question=question,
         expected_answer=case.get("expected_answer", ""),
         actual_answer=agent_result.final_answer,
-        dry_run=dry_run,
+        dry_run=dry_run,  # rescore=True keeps dry_run=False so judge runs
     )
     checks.append(judge_result)
 
@@ -398,6 +406,7 @@ def run_all_cases(
     dry_run: bool,
     concurrency: int,
     repeats: int,
+    rescore: bool = False,
 ) -> list[EvalResult]:
     """Run all cases (with optional repeats) in parallel.
 
@@ -416,7 +425,7 @@ def run_all_cases(
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         future_to_job = {
-            pool.submit(evaluate_case, case, traces_dir, dry_run, repeat_index): (case, repeat_index)
+            pool.submit(evaluate_case, case, traces_dir, dry_run, repeat_index, rescore): (case, repeat_index)
             for case, repeat_index in jobs
         }
         for future in as_completed(future_to_job):
@@ -475,6 +484,11 @@ def parse_args() -> argparse.Namespace:
         help="Load existing traces from disk; skip live agent calls and LLM judge.",
     )
     p.add_argument(
+        "--rescore",
+        action="store_true",
+        help="Load existing traces from disk and re-run all checks + LLM judge without re-calling the agent.",
+    )
+    p.add_argument(
         "--concurrency",
         type=int,
         default=2,
@@ -529,7 +543,13 @@ def main() -> int:
     if _PLUGINS_DIR.exists():
         load_plugins(str(_PLUGINS_DIR))
 
-    if not args.dry_run:
+    if args.dry_run and args.rescore:
+        print("ERROR: --dry-run and --rescore are mutually exclusive.", file=sys.stderr)
+        return 1
+
+    # API key is only needed when actually calling the agent or judge
+    needs_api = not args.dry_run
+    if needs_api:
         import os
         if not os.getenv("ANTHROPIC_API_KEY"):
             print(
@@ -556,10 +576,15 @@ def main() -> int:
 
     traces_dir = Path(args.traces_dir)
     repeat_str = f", repeats={args.repeats}" if args.repeats > 1 else ""
-    mode = "[dry-run]" if args.dry_run else f"[live, concurrency={args.concurrency}{repeat_str}]"
+    if args.dry_run:
+        mode = "[dry-run, no judge]"
+    elif args.rescore:
+        mode = "[rescore from disk]"
+    else:
+        mode = f"[live, concurrency={args.concurrency}{repeat_str}]"
     print(f"\nEvaluating {len(cases)} case(s) {mode}\n")
 
-    if not args.dry_run and args.concurrency * args.repeats > 4:
+    if not args.dry_run and not args.rescore and args.concurrency * args.repeats > 4:
         print(
             f"  WARNING: concurrency={args.concurrency} × repeats={args.repeats} may hit the "
             f"50 RPM rate limit. Consider --concurrency 1 or --concurrency 2 for large runs.\n"
@@ -571,6 +596,7 @@ def main() -> int:
         dry_run=args.dry_run,
         concurrency=args.concurrency,
         repeats=args.repeats,
+        rescore=args.rescore,
     )
 
     print_report(results)
