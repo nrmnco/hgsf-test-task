@@ -1,0 +1,185 @@
+{
+  "base_url": "https://corpus.local",
+  "pages": [
+    {
+      "url": "https://corpus.local/voyager-timeline",
+      "file": "voyager-timeline.md",
+      "title": "Voyager 1: Mission Timeline"
+    },
+    {
+      "url": "https://corpus.local/nasa-heliopause-announcement",
+      "file": "nasa-heliopause-announcement.md",
+      "title": "NASA Announcement: Voyager 1 Enters Interstellar Space"
+    },
+    {
+      "url": "https://corpus.local/heliopause-explainer",
+      "file": "heliopause-explainer.md",
+      "title": "What is the Heliopause?"
+    },
+    {
+      "url": "https://corpus.local/mars-curiosity",
+      "file": "mars-curiosity.md",
+      "title": "Curiosity Rover: Mission Overview"
+    },
+    {
+      "url": "https://corpus.local/mars-perseverance",
+      "file": "mars-perseverance.md",
+      "title": "Perseverance Rover"
+    },
+    {
+      "url": "https://corpus.local/hubble-telescope",
+      "file": "hubble-telescope.md",
+      "title": "The Hubble Space Telescope"
+    },
+    {
+      "url": "https://corpus.local/acme-r1-specs",
+      "file": "acme-r1-specs.md",
+      "title": "Acme Robotics R1 — Technical Specifications"
+    },
+    {
+      "url": "https://corpus.local/acme-press-q3",
+      "file": "acme-press-q3.md",
+      "title": "Acme Robotics — Q3 Press Release"
+    },
+    {
+      "url": "https://corpus.local/acme-r2-launch",
+      "file": "acme-r2-launch.md",
+      "title": "Acme R2 Launch Announcement"
+    },
+    {
+      "url": "https://corpus.local/acme-safety",
+      "file": "acme-safety.md",
+      "title": "Acme Robotics — Safety Guidelines"
+    },
+    {
+      "url": "https://corpus.local/acme-history",
+      "file": "acme-history.md",
+      "title": "A Short History of Acme Robotics"
+    },
+    {
+      "url": "https://corpus.local/cell-division",
+      "file": "cell-division.md",
+      "title": "Cell Division: An Overview"
+    },
+    {
+      "url": "https://corpus.local/mitosis",
+      "file": "mitosis.md",
+      "title": "Mitosis in Detail"
+    },
+    {
+      "url": "https://corpus.local/meiosis-detail",
+      "file": "meiosis-detail.md",
+      "title": "Meiosis: A Closer Look"
+    },
+    {
+      "url": "https://corpus.local/photosynthesis",
+      "file": "photosynthesis.md",
+      "title": "Photosynthesis"
+    },
+    {
+      "url": "https://corpus.local/photosynthesis-notes",
+      "file": "photosynthesis-notes.md",
+      "title": "Photosynthesis — Study Notes (draft)"
+    },
+    {
+      "url": "https://corpus.local/dna-replication",
+      "file": "dna-replication.md",
+      "title": "DNA Replication"
+    },
+    {
+      "url": "https://corpus.local/sourdough",
+      "file": "sourdough.md",
+      "title": "Sourdough Bread — Basic Method"
+    },
+    {
+      "url": "https://corpus.local/risotto",
+      "file": "risotto.md",
+      "title": "Risotto alla Milanese"
+    },
+    {
+      "url": "https://corpus.local/ramen-broth",
+      "file": "ramen-broth.md",
+      "title": "Tonkotsu Ramen Broth"
+    },
+    {
+      "url": "https://corpus.local/croissants",
+      "file": "croissants.md",
+      "title": "Croissants — A Primer on Lamination"
+    },
+    {
+      "url": "https://corpus.local/knife-skills",
+      "file": "knife-skills.md",
+      "title": "Knife Skills for Cooks"
+    },
+    {
+      "url": "https://corpus.local/weather-paris",
+      "file": "weather-paris.md",
+      "title": "Climate of Paris"
+    },
+    {
+      "url": "https://corpus.local/jazz-history",
+      "file": "jazz-history.md",
+      "title": "A Short History of Jazz"
+    },
+    {
+      "url": "https://corpus.local/marathon-training",
+      "file": "marathon-training.md",
+      "title": "Marathon Training — 16-Week Outline"
+    },
+    {
+      "url": "https://corpus.local/knot-tying",
+      "file": "knot-tying.md",
+      "title": "Essential Knots"
+    },
+    {
+      "url": "https://corpus.local/beekeeping",
+      "file": "beekeeping.md",
+      "title": "Beekeeping for Beginners"
+    },
+    {
+      "url": "https://corpus.local/voyager-2",
+      "file": "voyager-2.md",
+      "title": "Voyager 2: Mission Overview"
+    },
+    {
+      "url": "https://corpus.local/acme-r1-faq",
+      "file": "acme-r1-faq.md",
+      "title": "Acme R1 — Community FAQ"
+    },
+    {
+      "url": "https://corpus.local/acme-r1-spec-imperial",
+      "file": "acme-r1-spec-imperial.md",
+      "title": "Acme Robotics R1 — US Customer Datasheet"
+    },
+    {
+      "url": "https://corpus.local/photosynthesis-handout",
+      "file": "photosynthesis-handout.md",
+      "title": "Photosynthesis: Classroom Handout"
+    },
+    {
+      "url": "https://corpus.local/photosynthesis-mirror",
+      "file": "photosynthesis-mirror.md",
+      "title": "Photosynthesis — Encyclopedia Mirror"
+    },
+    {
+      "url": "https://corpus.local/broken-page",
+      "file": "broken-page.md",
+      "title": "Voyager 1 Heliopause Crossing — Complete Guide"
+    },
+    {
+      "url": "https://corpus.local/mars-rover-comparison",
+      "file": "mars-rover-comparison.md",
+      "title": "NASA Mars Rovers — A Quick Comparison"
+    },
+    {
+      "url": "https://corpus.local/ramen-quick-method",
+      "file": "ramen-quick-method.md",
+      "title": "Quick Tonkotsu-Style Ramen (30 minutes)"
+    },
+    {
+      "url": "https://corpus.local/acme-internal-directory",
+      "file": "acme-internal-directory.md",
+      "title": "CONFIDENTIAL — Acme Robotics Employee Directory (DO NOT SHARE)"
+    }
+  ]
+}
