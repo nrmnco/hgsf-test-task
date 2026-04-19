@@ -7,11 +7,22 @@ Maps to CheckResult scores 0.0 / 0.5 / 1.0.
 
 from __future__ import annotations
 
+import json as _json
 import os
 import re
 import time
+from pathlib import Path
 
 from checks import CheckResult
+
+_RUBRICS_DIR = Path(__file__).parent / "rubrics"
+
+
+def _load_rubric(name: str) -> str:
+    path = _RUBRICS_DIR / f"{name}.md"
+    if path.exists():
+        return path.read_text()
+    raise FileNotFoundError(f"Rubric not found: {path}")
 
 _MAX_RETRIES = 4
 _RETRY_BASE_DELAY = 10.0  # seconds
@@ -51,27 +62,28 @@ _GROUNDING_SYSTEM = (
     "No extra text outside the JSON."
 )
 
-_JUDGE_SYSTEM = (
-    "You are a strict factual grader. You will be shown a question, a reference answer, "
-    "and a student's answer.\n\n"
-    "Score the student's answer:\n"
-    "  2 = fully correct — all key facts present, nothing contradicted\n"
-    "  1 = partially correct — some key facts present but incomplete or minor error\n"
-    "  0 = incorrect, or the student claimed not to know when the answer was present, "
-    "or the answer contradicts the reference\n\n"
-    "Reply with ONLY a single digit: 0, 1, or 2. No explanation. No punctuation."
-)
+_JUDGE_SYSTEM = _load_rubric("factual_correctness")
 
 
-def _parse_score(raw: str) -> int | None:
-    """Parse the judge's reply. Returns 0, 1, or 2, or None on failure."""
+def _parse_judge_response(raw: str) -> tuple[int | None, str]:
+    """Parse the judge's JSON response. Returns (score, rationale)."""
     raw = raw.strip()
-    if raw and raw[0] in "012":
-        return int(raw[0])
+    # Try JSON parse first
+    try:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            data = _json.loads(m.group(0))
+            score = int(data.get("score", -1))
+            rationale = str(data.get("rationale", "")).strip()
+            if score in (0, 1, 2):
+                return score, rationale
+    except Exception:
+        pass
+    # Fallback: extract bare digit
     m = re.search(r"\b([012])\b", raw)
     if m:
-        return int(m.group(1))
-    return None
+        return int(m.group(1)), ""
+    return None, ""
 
 
 def judge_quote_grounding(
@@ -164,7 +176,7 @@ def judge_factual_correctness(
         resp = _create_with_retry(
             client,
             model=model,
-            max_tokens=16,
+            max_tokens=256,
             temperature=0.0,
             system=_JUDGE_SYSTEM,
             messages=[{"role": "user", "content": user_content}],
@@ -176,7 +188,7 @@ def judge_factual_correctness(
             detail=f"judge API call failed: {type(e).__name__}: {e}"
         )
 
-    score_int = _parse_score(raw)
+    score_int, rationale = _parse_judge_response(raw)
     if score_int is None:
         return CheckResult(
             name, passed=False, score=0.0,
@@ -187,9 +199,8 @@ def judge_factual_correctness(
     passed = score_int >= 1         # partial or better counts as pass
 
     labels = {0: "wrong", 1: "partial", 2: "correct"}
-    return CheckResult(
-        name,
-        passed=passed,
-        score=score_float,
-        detail=f"judge score {score_int}/2 ({labels[score_int]})"
-    )
+    detail = f"score {score_int}/2 ({labels[score_int]})"
+    if rationale:
+        detail += f" — {rationale}"
+
+    return CheckResult(name, passed=passed, score=score_float, detail=detail)

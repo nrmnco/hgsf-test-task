@@ -27,11 +27,12 @@ from pathlib import Path
 
 # Make the repo root importable
 _REPO_ROOT = Path(__file__).parent.parent
+_PLUGINS_DIR = Path(__file__).parent / "plugins"
 sys.path.insert(0, str(_REPO_ROOT))
 
 from dotenv import load_dotenv
 
-from checks import CheckResult, run_deterministic_checks
+from checks import CheckResult, load_plugins, run_deterministic_checks
 from judge import judge_factual_correctness
 from report import load_baseline, print_diff, print_report, save_report
 from viewer import generate_index, generate_viewer
@@ -490,6 +491,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     load_dotenv(_REPO_ROOT / ".env")
     args = parse_args()
+
+    # Load plugin checks from eval/plugins/*.py
+    if _PLUGINS_DIR.exists():
+        load_plugins(str(_PLUGINS_DIR))
 
     if not args.dry_run:
         import os

@@ -2,16 +2,43 @@
 
 All check functions are pure: they take a test-case dict and a RunResult,
 and return a CheckResult. No I/O, no LLM calls, no side effects.
+
+Adding a new check
+------------------
+Create a file in eval/plugins/ and decorate your function with @register_check:
+
+    from checks import register_check, CheckResult, _PASS, _FAIL, _SKIP
+
+    @register_check
+    def check_my_metric(case, result):
+        ...
+        return _PASS("my_metric")
+
+No edits to this file or runner.py required.
 """
 
 from __future__ import annotations
 
+import inspect
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from agent import RunResult
+
+
+# ---------------------------------------------------------------------------
+# Plugin registry
+# ---------------------------------------------------------------------------
+
+_REGISTRY: list[Callable] = []
+
+
+def register_check(fn: Callable) -> Callable:
+    """Decorator — registers a check function into the global registry."""
+    _REGISTRY.append(fn)
+    return fn
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +135,7 @@ def _get_forbidden(case: dict[str, Any]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_must_contain(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "must_contain"
     required = case.get("must_contain") or []
@@ -126,6 +154,7 @@ def check_must_contain(case: dict[str, Any], result: "RunResult") -> CheckResult
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_must_not_contain(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "must_not_contain"
     forbidden = _get_forbidden(case)
@@ -144,6 +173,7 @@ def check_must_not_contain(case: dict[str, Any], result: "RunResult") -> CheckRe
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_must_not_cite(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "must_not_cite"
     forbidden_urls = case.get("must_not_cite") or []
@@ -162,6 +192,7 @@ def check_must_not_cite(case: dict[str, Any], result: "RunResult") -> CheckResul
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_citation_fidelity(case: dict[str, Any], result: "RunResult") -> CheckResult:
     """Every URL in citations must have been fetched via fetch_url in the trace."""
     name = "citation_fidelity"
@@ -183,6 +214,7 @@ def check_citation_fidelity(case: dict[str, Any], result: "RunResult") -> CheckR
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_answer_length(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "answer_length"
     answer = result.final_answer or ""
@@ -200,6 +232,7 @@ def check_answer_length(case: dict[str, Any], result: "RunResult") -> CheckResul
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_stopped_reason(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "stopped_reason"
     # For unanswerable and confidential cases the agent has no grounded content
@@ -219,6 +252,7 @@ def check_stopped_reason(case: dict[str, Any], result: "RunResult") -> CheckResu
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_step_count(case: dict[str, Any], result: "RunResult") -> CheckResult:
     name = "step_count"
     max_expected = case.get("max_steps_expected")
@@ -236,6 +270,7 @@ def check_step_count(case: dict[str, Any], result: "RunResult") -> CheckResult:
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_hallucination(case: dict[str, Any], result: "RunResult", dry_run: bool = False) -> CheckResult:
     """
     For each quote returned by extract_quotes, use an LLM judge to verify
@@ -307,6 +342,7 @@ def check_hallucination(case: dict[str, Any], result: "RunResult", dry_run: bool
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_confidential_not_fetched(case: dict[str, Any], result: "RunResult") -> CheckResult:
     """
     For confidential cases: the confidential page must not appear in any
@@ -334,6 +370,7 @@ def check_confidential_not_fetched(case: dict[str, Any], result: "RunResult") ->
 # ---------------------------------------------------------------------------
 
 
+@register_check
 def check_tool_sequence(case: dict[str, Any], result: "RunResult") -> CheckResult:
     """Verify that required tools were called in the specified order.
 
@@ -385,22 +422,33 @@ def check_tool_sequence(case: dict[str, Any], result: "RunResult") -> CheckResul
 # ---------------------------------------------------------------------------
 
 
-_STANDARD_CHECKS = [
-    check_must_contain,
-    check_must_not_contain,
-    check_must_not_cite,
-    check_citation_fidelity,
-    check_answer_length,
-    check_stopped_reason,
-    check_step_count,
-    check_tool_sequence,
-    check_confidential_not_fetched,
-]
-
-
 def run_deterministic_checks(
     case: dict[str, Any], result: "RunResult", dry_run: bool = False
 ) -> list[CheckResult]:
-    results = [fn(case, result) for fn in _STANDARD_CHECKS]
-    results.append(check_hallucination(case, result, dry_run=dry_run))
+    """Run all registered checks against a case and its RunResult.
+
+    Checks that accept a `dry_run` parameter receive it automatically.
+    Plugin checks discovered from eval/plugins/ are included if load_plugins()
+    has been called (runner.py does this at startup).
+    """
+    results = []
+    for fn in _REGISTRY:
+        sig = inspect.signature(fn)
+        if "dry_run" in sig.parameters:
+            results.append(fn(case, result, dry_run=dry_run))
+        else:
+            results.append(fn(case, result))
     return results
+
+
+def load_plugins(plugins_dir: str) -> None:
+    """Import all *.py files in plugins_dir so their @register_check decorators run."""
+    import importlib.util
+    from pathlib import Path
+
+    for path in sorted(Path(plugins_dir).glob("*.py")):
+        if path.stem.startswith("_"):
+            continue
+        spec = importlib.util.spec_from_file_location(f"plugins.{path.stem}", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
