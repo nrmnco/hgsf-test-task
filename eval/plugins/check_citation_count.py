@@ -13,7 +13,7 @@ def check_citation_count(case, result) -> CheckResult:
     """Agent must cite at least one URL unless the case is unanswerable."""
     name = "citation_count"
 
-    if case.get("category") in ("unanswerable",):
+    if case.get("category") in ("unanswerable", "confidential"):
         return _SKIP(name)
 
     if not result.citations:

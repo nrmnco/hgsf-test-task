@@ -85,16 +85,26 @@ def print_report(results: list["EvalResult"]) -> None:
             (cost_cell, _COL["cost"]),
         ]))
 
-        # Print failed check details indented
-        for c in r.checks:
-            if not c.passed and c.score != -1.0 and c.detail:
-                print(f"    ✗ {c.check_name}: {c.detail}")
-
-        # For repeats: show per-check variance for checks that weren't perfectly consistent
         if r.total_runs > 1:
+            # Repeats mode: show pass rate per metric for every applicable check
             for c in r.checks:
-                if c.score not in (-1.0, 0.0, 1.0) and c.detail:
-                    print(f"    ~ {c.check_name}: {c.detail} (flaky)")
+                if c.score == -1.0:
+                    continue  # not applicable, skip
+                if c.passed and c.score == 1.0:
+                    icon = "✓"
+                    suffix = ""
+                elif not c.passed and c.score == 0.0:
+                    icon = "✗"
+                    suffix = ""
+                else:
+                    icon = "~"
+                    suffix = " (flaky)"
+                print(f"    {icon} {c.check_name}: {c.detail}{suffix}")
+        else:
+            # Single run: only show failures with detail
+            for c in r.checks:
+                if not c.passed and c.score != -1.0 and c.detail:
+                    print(f"    ✗ {c.check_name}: {c.detail}")
 
     # Per-category summary
     by_cat: dict[str, list] = defaultdict(list)
