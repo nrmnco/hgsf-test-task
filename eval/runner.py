@@ -82,7 +82,14 @@ class EvalResult:
 def _load_dataset(path: Path) -> list[dict]:
     with path.open() as f:
         data = json.load(f)
-    return data["cases"]
+    if "cases" not in data:
+        raise ValueError(f"Dataset {path} is missing top-level 'cases' key")
+    cases = data["cases"]
+    for i, case in enumerate(cases):
+        for field in ("id", "question", "category"):
+            if field not in case:
+                raise ValueError(f"Case #{i} is missing required field '{field}'")
+    return cases
 
 
 def _result_from_dict(d: dict):
@@ -323,14 +330,15 @@ def evaluate_case(
 # ---------------------------------------------------------------------------
 
 
-def _aggregate_repeats(case: dict, runs: list[EvalResult]) -> EvalResult:
+def _aggregate_repeats(case: dict, runs: list[EvalResult], total_repeats: int = 0) -> EvalResult:
     """Combine N repeat EvalResults into one summary EvalResult.
 
     Aggregated checks show "X/N runs passed" as detail.
     overall_passed = True only if ALL runs passed.
+    total_repeats is the intended repeat count — may exceed len(runs) if some errored.
     """
     passed_count = sum(1 for r in runs if r.overall_passed)
-    total_runs = len(runs)
+    total_runs = total_repeats if total_repeats > 0 else len(runs)
 
     # Build aggregated checks: one CheckResult per check name
     check_names = [c.check_name for c in runs[0].checks] if runs else []
@@ -441,7 +449,7 @@ def run_all_cases(
             ))
         else:
             runs = [run_map[i] for i in range(1, repeats + 1) if i in run_map]
-            results.append(_aggregate_repeats(case, runs))
+            results.append(_aggregate_repeats(case, runs, total_repeats=repeats))
 
     return results
 

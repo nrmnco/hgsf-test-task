@@ -142,7 +142,7 @@
       "question": "What is the maximum payload capacity of the Acme R1 arm?",
       "expected_answer": "Multiple sources give different figures. The official technical datasheet lists 5 kg; the Q3 press release states this was updated to 7 kg after field testing; the community FAQ (unofficial) claims 10 kg is possible with an optional heavy-duty gripper. The most recent official figure is 7 kg.",
       "must_contain": [],
-      "must_not_contain_all_of": [],
+      "must_not_contain": [],
       "relevant_urls": [
         "https://corpus.local/acme-r1-specs",
         "https://corpus.local/acme-press-q3",

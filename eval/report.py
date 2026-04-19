@@ -20,14 +20,10 @@ _COL = {
     "id":       22,
     "category": 22,
     "result":   7,
-    "checks":   14,
+    "checks":   28,  # wide enough for check names + pass/fail counts
     "judge":    10,
     "cost":     9,
 }
-
-
-def _hdr(label: str, width: int) -> str:
-    return label.ljust(width)
 
 
 def _row(values: list[tuple[str, int]]) -> str:
@@ -60,7 +56,7 @@ def print_report(results: list["EvalResult"]) -> None:
         ("Case ID", _COL["id"]),
         ("Category", _COL["category"]),
         ("Result", _COL["result"]),
-        ("Checks", _COL["checks"] + 14),
+        ("Checks", _COL["checks"]),
         ("Judge", _COL["judge"]),
         ("Cost", _COL["cost"]),
     ])
@@ -84,7 +80,7 @@ def print_report(results: list["EvalResult"]) -> None:
             (r.case_id, _COL["id"]),
             (r.category, _COL["category"]),
             (result_label, _COL["result"]),
-            (checks_cell, _COL["checks"] + 14),
+            (checks_cell, _COL["checks"]),
             (judge_cell, _COL["judge"]),
             (cost_cell, _COL["cost"]),
         ]))
@@ -149,8 +145,8 @@ def print_report(results: list["EvalResult"]) -> None:
     total_out = sum(r.total_tokens.get("output", 0) for r in results)
 
     latencies = sorted(r.wall_time_ms for r in results if r.wall_time_ms > 0)
-    p50 = latencies[len(latencies) // 2] if latencies else 0
-    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+    p50 = latencies[(len(latencies) - 1) // 2] if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95) - 1] if latencies else 0
     mean_tools = (
         sum(r.tool_call_count for r in results) / total_all if total_all else 0
     )
@@ -298,8 +294,8 @@ def save_report(results: list["EvalResult"], path: str | Path) -> None:
     total_out = sum(r.total_tokens.get("output", 0) for r in results)
 
     latencies = sorted(r.wall_time_ms for r in results if r.wall_time_ms > 0)
-    p50 = latencies[len(latencies) // 2] if latencies else 0
-    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+    p50 = latencies[(len(latencies) - 1) // 2] if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95) - 1] if latencies else 0
     mean_tools = round(
         sum(r.tool_call_count for r in results) / total_all, 2
     ) if total_all else 0

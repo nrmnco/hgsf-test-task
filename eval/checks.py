@@ -54,9 +54,16 @@ class CheckResult:
     detail: str    # empty string on clean pass
 
 
-_SKIP = lambda name: CheckResult(name, passed=True, score=-1.0, detail="not applicable")
-_PASS = lambda name: CheckResult(name, passed=True, score=1.0, detail="")
-_FAIL = lambda name, msg: CheckResult(name, passed=False, score=0.0, detail=msg)
+def _SKIP(name: str) -> CheckResult:
+    return CheckResult(name, passed=True, score=-1.0, detail="not applicable")
+
+
+def _PASS(name: str) -> CheckResult:
+    return CheckResult(name, passed=True, score=1.0, detail="")
+
+
+def _FAIL(name: str, msg: str) -> CheckResult:
+    return CheckResult(name, passed=False, score=0.0, detail=msg)
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +133,7 @@ def _normalize(text: str) -> str:
 
 
 def _get_forbidden(case: dict[str, Any]) -> list[str]:
-    """Handle the must_not_contain / must_not_contain_all_of key inconsistency."""
-    return case.get("must_not_contain") or case.get("must_not_contain_all_of") or []
+    return case.get("must_not_contain") or []
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +202,7 @@ def check_must_not_cite(case: dict[str, Any], result: "RunResult") -> CheckResul
 def check_citation_fidelity(case: dict[str, Any], result: "RunResult") -> CheckResult:
     """Every URL in citations must have been fetched via fetch_url in the trace."""
     name = "citation_fidelity"
-    citations = list(set(result.citations))
+    citations = list(dict.fromkeys(result.citations))
     if not citations:
         return _PASS(name)
 
