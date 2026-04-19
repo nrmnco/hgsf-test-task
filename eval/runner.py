@@ -65,6 +65,7 @@ class EvalResult:
     checks: list[CheckResult] = field(default_factory=list)
     overall_passed: bool = False
     error: str | None = None
+    tool_call_count: int = 0  # number of tool calls made by the agent
     # Repeat / flakiness support (populated when --repeats > 1)
     sub_runs: list["EvalResult"] = field(default_factory=list)
     passed_count: int = 1   # how many of total_runs passed
@@ -260,6 +261,12 @@ def evaluate_case(
     )
     checks.append(judge_result)
 
+    tool_call_count = sum(
+        len(m.get("tool_calls", []))
+        for m in agent_result.messages
+        if m.get("role") == "assistant"
+    )
+
     eval_result = EvalResult(
         case_id=case_id,
         category=category,
@@ -274,6 +281,7 @@ def evaluate_case(
         checks=checks,
         overall_passed=_overall_passed(checks),
         error=agent_result.error,
+        tool_call_count=tool_call_count,
     )
 
     # Generate HTML trace viewer
@@ -338,6 +346,7 @@ def _aggregate_repeats(case: dict, runs: list[EvalResult]) -> EvalResult:
         checks=agg_checks,
         overall_passed=(passed_count == total_runs),
         error=None,
+        tool_call_count=sum(r.tool_call_count for r in runs),
         sub_runs=runs,
         passed_count=passed_count,
         total_runs=total_runs,

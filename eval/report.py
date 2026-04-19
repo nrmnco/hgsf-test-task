@@ -148,6 +148,13 @@ def print_report(results: list["EvalResult"]) -> None:
     total_in = sum(r.total_tokens.get("input", 0) for r in results)
     total_out = sum(r.total_tokens.get("output", 0) for r in results)
 
+    latencies = sorted(r.wall_time_ms for r in results if r.wall_time_ms > 0)
+    p50 = latencies[len(latencies) // 2] if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+    mean_tools = (
+        sum(r.tool_call_count for r in results) / total_all if total_all else 0
+    )
+
     print()
     print(sep)
     print(
@@ -155,6 +162,10 @@ def print_report(results: list["EvalResult"]) -> None:
         f"({passed_all/total_all:.0%})  "
         f"Cost: ${total_cost:.4f}  "
         f"Tokens: in={total_in:,} out={total_out:,}"
+    )
+    print(
+        f"Latency: p50={p50:,}ms  p95={p95:,}ms  "
+        f"Avg tool calls/case: {mean_tools:.1f}"
     )
     print()
 
@@ -286,6 +297,13 @@ def save_report(results: list["EvalResult"], path: str | Path) -> None:
     total_in = sum(r.total_tokens.get("input", 0) for r in results)
     total_out = sum(r.total_tokens.get("output", 0) for r in results)
 
+    latencies = sorted(r.wall_time_ms for r in results if r.wall_time_ms > 0)
+    p50 = latencies[len(latencies) // 2] if latencies else 0
+    p95 = latencies[int(len(latencies) * 0.95)] if latencies else 0
+    mean_tools = round(
+        sum(r.tool_call_count for r in results) / total_all, 2
+    ) if total_all else 0
+
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "summary": {
@@ -295,6 +313,8 @@ def save_report(results: list["EvalResult"], path: str | Path) -> None:
             "pass_rate": round(passed_all / total_all, 4) if total_all else 0.0,
             "total_cost_usd": round(total_cost, 6),
             "total_tokens": {"input": total_in, "output": total_out},
+            "latency_ms": {"p50": p50, "p95": p95},
+            "avg_tool_calls_per_case": mean_tools,
             "by_category": category_summary,
         },
         "cases": [
@@ -305,6 +325,8 @@ def save_report(results: list["EvalResult"], path: str | Path) -> None:
                 "run_id": r.run_id,
                 "stopped_reason": r.stopped_reason,
                 "cost_usd": round(r.cost_usd, 6),
+                "wall_time_ms": r.wall_time_ms,
+                "tool_call_count": r.tool_call_count,
                 "total_tokens": r.total_tokens,
                 "final_answer": r.final_answer,
                 "citations": r.citations,
