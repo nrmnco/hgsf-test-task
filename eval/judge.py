@@ -9,8 +9,31 @@ from __future__ import annotations
 
 import os
 import re
+import time
 
 from checks import CheckResult
+
+_MAX_RETRIES = 4
+_RETRY_BASE_DELAY = 10.0  # seconds
+
+
+def _create_with_retry(client, **kwargs) -> object:
+    """Call client.messages.create with exponential backoff on 429 and 5xx."""
+    import anthropic
+    delay = _RETRY_BASE_DELAY
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            return client.messages.create(**kwargs)
+        except anthropic.RateLimitError:
+            if attempt == _MAX_RETRIES:
+                raise
+            time.sleep(delay)
+            delay *= 2
+        except anthropic.APIStatusError as e:
+            if e.status_code < 500 or attempt == _MAX_RETRIES:
+                raise
+            time.sleep(delay)
+            delay *= 2
 
 _GROUNDING_SYSTEM = (
     "You are a strict hallucination detector. You will be shown a source text and one or more "
@@ -79,7 +102,8 @@ def judge_quote_grounding(
     )
 
     try:
-        resp = client.messages.create(
+        resp = _create_with_retry(
+            client,
             model=model,
             max_tokens=512,
             temperature=0.0,
@@ -137,7 +161,8 @@ def judge_factual_correctness(
     )
 
     try:
-        resp = client.messages.create(
+        resp = _create_with_retry(
+            client,
             model=model,
             max_tokens=16,
             temperature=0.0,

@@ -33,7 +33,8 @@ from dotenv import load_dotenv
 
 from checks import CheckResult, run_deterministic_checks
 from judge import judge_factual_correctness
-from report import print_report, save_report
+from report import load_baseline, print_diff, print_report, save_report
+from viewer import generate_index, generate_viewer
 
 # Lock for thread-safe console output
 _print_lock = threading.Lock()
@@ -259,7 +260,7 @@ def evaluate_case(
     )
     checks.append(judge_result)
 
-    return EvalResult(
+    eval_result = EvalResult(
         case_id=case_id,
         category=category,
         question=question,
@@ -274,6 +275,13 @@ def evaluate_case(
         overall_passed=_overall_passed(checks),
         error=agent_result.error,
     )
+
+    # Generate HTML trace viewer
+    trace_path = traces_dir / f"{_trace_name(case_id, repeat_index)}.json"
+    viewer_path = traces_dir / f"{_trace_name(case_id, repeat_index)}.html"
+    generate_viewer(eval_result, trace_path, viewer_path)
+
+    return eval_result
 
 
 # ---------------------------------------------------------------------------
@@ -426,9 +434,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--concurrency",
         type=int,
-        default=4,
+        default=2,
         metavar="N",
-        help="Maximum number of cases to run in parallel (default: 4).",
+        help="Maximum number of cases to run in parallel (default: 2). "
+             "Keep low to avoid hitting the 50 RPM rate limit.",
     )
     p.add_argument(
         "--repeats",
@@ -454,6 +463,17 @@ def parse_args() -> argparse.Namespace:
         default=str(_REPO_ROOT / "eval_report.json"),
         metavar="PATH",
         help="Path to write the JSON report (default: eval_report.json)",
+    )
+    p.add_argument(
+        "--baseline",
+        default=str(_REPO_ROOT / "eval_report_baseline.json"),
+        metavar="PATH",
+        help="Path to a previous report to diff against (default: eval_report_baseline.json)",
+    )
+    p.add_argument(
+        "--save-baseline",
+        action="store_true",
+        help="After running, save the current report as the new baseline.",
     )
     return p.parse_args()
 
@@ -492,6 +512,12 @@ def main() -> int:
     mode = "[dry-run]" if args.dry_run else f"[live, concurrency={args.concurrency}{repeat_str}]"
     print(f"\nEvaluating {len(cases)} case(s) {mode}\n")
 
+    if not args.dry_run and args.concurrency * args.repeats > 4:
+        print(
+            f"  WARNING: concurrency={args.concurrency} × repeats={args.repeats} may hit the "
+            f"50 RPM rate limit. Consider --concurrency 1 or --concurrency 2 for large runs.\n"
+        )
+
     results = run_all_cases(
         cases=cases,
         traces_dir=traces_dir,
@@ -502,6 +528,24 @@ def main() -> int:
 
     print_report(results)
     save_report(results, args.output)
+
+    # Generate HTML index in repo root for easy access
+    index_path = _REPO_ROOT / "report.html"
+    generate_index(results, index_path)
+    print(f"Viewer index: {index_path}\n")
+
+    # Diff vs baseline
+    baseline = load_baseline(args.baseline)
+    if baseline:
+        print_diff(results, baseline)
+    else:
+        print(f"(No baseline found at {args.baseline} — run with --save-baseline to create one.)\n")
+
+    # Optionally promote current report to baseline
+    if args.save_baseline:
+        import shutil
+        shutil.copy(args.output, args.baseline)
+        print(f"Baseline saved to {args.baseline}\n")
 
     all_passed = all(r.overall_passed for r in results)
     return 0 if all_passed else 1

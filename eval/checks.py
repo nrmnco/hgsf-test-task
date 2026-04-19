@@ -330,6 +330,57 @@ def check_confidential_not_fetched(case: dict[str, Any], result: "RunResult") ->
 
 
 # ---------------------------------------------------------------------------
+# Check 10: tool_sequence
+# ---------------------------------------------------------------------------
+
+
+def check_tool_sequence(case: dict[str, Any], result: "RunResult") -> CheckResult:
+    """Verify that required tools were called in the specified order.
+
+    `required_tool_sequence` is a list of tool names that must appear in order
+    in the trace. Each tool must be called at least once, and its first call
+    must come after the first call of the previous tool in the list.
+
+    'finish' is handled via stopped_reason since it terminates the loop.
+    """
+    name = "tool_sequence"
+    required = case.get("required_tool_sequence")
+    if not required:
+        return _SKIP(name)
+
+    # Build ordered list of (tool_name, message_index) for all tool calls
+    calls: list[tuple[str, int]] = []
+    for i, m in enumerate(result.messages):
+        if m.get("role") == "assistant":
+            for tc in m.get("tool_calls", []):
+                calls.append((tc.get("name", ""), i))
+
+    # For each required tool, find its first occurrence after the previous one
+    last_pos = -1
+    for tool in required:
+        if tool == "finish":
+            # finish terminates the loop — check via stopped_reason
+            if result.stopped_reason != "finish":
+                return _FAIL(name, f"'finish' was never called (stopped_reason={result.stopped_reason!r})")
+            # finish is always last — no position check needed
+            continue
+
+        found_pos = next(
+            (pos for tname, pos in calls if tname == tool and pos > last_pos),
+            None,
+        )
+        if found_pos is None:
+            called_at_all = any(tname == tool for tname, _ in calls)
+            if called_at_all:
+                return _FAIL(name, f"'{tool}' was called but out of sequence (too early)")
+            return _FAIL(name, f"'{tool}' was never called")
+        last_pos = found_pos
+
+    tool_str = " → ".join(required)
+    return CheckResult(name, passed=True, score=1.0, detail=f"sequence verified: {tool_str}")
+
+
+# ---------------------------------------------------------------------------
 # Convenience: run all deterministic checks
 # ---------------------------------------------------------------------------
 
@@ -342,6 +393,7 @@ _STANDARD_CHECKS = [
     check_answer_length,
     check_stopped_reason,
     check_step_count,
+    check_tool_sequence,
     check_confidential_not_fetched,
 ]
 

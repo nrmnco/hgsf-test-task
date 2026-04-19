@@ -160,6 +160,90 @@ def print_report(results: list["EvalResult"]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Diff vs baseline
+# ---------------------------------------------------------------------------
+
+
+def load_baseline(path: str | Path) -> dict | None:
+    """Load a previous report JSON as a baseline. Returns None if not found."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    with p.open() as f:
+        return json.load(f)
+
+
+def print_diff(results: list["EvalResult"], baseline: dict) -> None:
+    """Compare current results against a baseline report and print regressions/fixes."""
+    # Build lookup: case_id -> {check_name -> passed}
+    def _index(cases: list[dict]) -> dict[str, dict]:
+        out = {}
+        for c in cases:
+            out[c["case_id"]] = {
+                "overall": c["overall_passed"],
+                "checks": {ch["check_name"]: ch["passed"] for ch in c.get("checks", [])},
+            }
+        return out
+
+    baseline_idx = _index(baseline.get("cases", []))
+    current_idx = _index([
+        {
+            "case_id": r.case_id,
+            "overall_passed": r.overall_passed,
+            "checks": [{"check_name": c.check_name, "passed": c.passed} for c in r.checks],
+        }
+        for r in results
+    ])
+
+    regressions: list[tuple[str, list[str]]] = []  # (case_id, [check_names that broke])
+    fixes: list[str] = []
+    new_cases: list[str] = []
+
+    for case_id, cur in current_idx.items():
+        if case_id not in baseline_idx:
+            new_cases.append(case_id)
+            continue
+        base = baseline_idx[case_id]
+
+        if base["overall"] and not cur["overall"]:
+            # Find which specific checks newly failed
+            broke = [
+                name for name, passed in cur["checks"].items()
+                if not passed and base["checks"].get(name, True)
+            ]
+            regressions.append((case_id, broke))
+        elif not base["overall"] and cur["overall"]:
+            fixes.append(case_id)
+
+    if not regressions and not fixes and not new_cases:
+        print("Diff vs baseline: no changes detected.\n")
+        return
+
+    sep = "-" * 60
+    print()
+    print("Diff vs baseline")
+    print(sep)
+
+    if regressions:
+        print(f"REGRESSIONS ({len(regressions)}) — were passing, now failing:")
+        for case_id, broke in regressions:
+            checks_str = ", ".join(broke) if broke else "overall"
+            print(f"  ✗ {case_id}: {checks_str}")
+
+    if fixes:
+        print(f"FIXES ({len(fixes)}) — were failing, now passing:")
+        for case_id in fixes:
+            print(f"  ✓ {case_id}")
+
+    if new_cases:
+        print(f"NEW ({len(new_cases)}) — not in baseline:")
+        for case_id in new_cases:
+            print(f"  + {case_id}")
+
+    print()
+
+
+# ---------------------------------------------------------------------------
 # JSON report
 # ---------------------------------------------------------------------------
 
