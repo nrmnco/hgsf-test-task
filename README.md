@@ -77,7 +77,7 @@ python eval/runner.py --repeats 3
 
 Each case declares a mix of hard assertions (`must_contain`, `must_not_contain`, `must_not_cite`, `required_tool_sequence`, `max_steps_expected`) and an `expected_answer` for the LLM judge.
 
-**Committed fixtures** (`eval/fixtures/`) hold pre-recorded traces for one case per category — use `make test-dry` to rescore them offline or `make test-fixtures` to rescore with the judge.
+**Committed fixtures** (`fixtures/`) hold pre-recorded traces for one case per category — use `make test-dry` to rescore them offline or `make test-fixtures` to rescore with the judge.
 
 ---
 

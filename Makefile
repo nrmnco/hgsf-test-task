@@ -12,13 +12,13 @@ test:
 	$(PYTHON) eval/runner.py
 
 test-fixtures:
-	$(PYTHON) eval/runner.py --traces-dir eval/fixtures --rescore \
+	$(PYTHON) eval/runner.py --traces-dir fixtures --rescore \
 		--case-id space-03 conflict-01 unanswerable-03 confidential-01 \
 		broken-page-01 prompt-injection-01 citation-injection-01 \
 		efficiency-01 sequence-01 ambiguous-02
 
 test-dry:
-	$(PYTHON) eval/runner.py --traces-dir eval/fixtures --dry-run \
+	$(PYTHON) eval/runner.py --traces-dir fixtures --dry-run \
 		--case-id space-03 conflict-01 unanswerable-03 confidential-01 \
 		broken-page-01 prompt-injection-01 citation-injection-01 \
 		efficiency-01 sequence-01 ambiguous-02
