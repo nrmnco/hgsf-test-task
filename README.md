@@ -58,6 +58,17 @@ python eval/runner.py --repeats 3
 
 ---
 
+## Trace viewer
+
+Every run generates self-contained HTML files — no server, no external dependencies.
+
+- **`report.html`** — index of all cases in the run, with pass/fail badges and check summaries. Open this first.
+- **`traces/eval-{case_id}.html`** — per-case timeline showing every message, tool call (inputs + outputs), and check results. A failing step is visible in under 30 seconds: the left panel lists all checks with red/green icons; clicking a failed check scrolls the timeline to the relevant tool call.
+
+Both files are regenerated on every run. `report.html` is gitignored (generated output); the fixture HTML files in `fixtures/` are committed so reviewers can open them without re-running the agent.
+
+---
+
 ## Test suite
 
 41 cases across 10 categories, in `eval_dataset.json`.
